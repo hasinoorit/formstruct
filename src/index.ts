@@ -294,12 +294,13 @@ const setNestedValue = (
  * @template T - The type of the resulting parsed object
  */
 export const createParser = <T = any>(schema: Schema) => {
-  enhanceSchema(normalizeSchema(schema, schema));
+  const _schema = normalizeSchema(schema, schema);
+  enhanceSchema(_schema);
   return (formData: FormData): T => {
-    const root: any = getDefault(schema);
+    const root: any = getDefault(_schema);
     formData.forEach((value, key) => {
       const keys = key.replace(/\[(\d+)]/g, ".$1").split(".");
-      setNestedValue(schema, root, keys, value);
+      setNestedValue(_schema, root, keys, value);
     });
     return root as T;
   };

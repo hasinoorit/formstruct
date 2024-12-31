@@ -1,6 +1,6 @@
 {
   "name": "formstruct",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Effortlessly transform raw form data into structured objects using JSON Schema.",
   "author": "MD. HASHINUR RAHMAN",
   "license": "MIT",
