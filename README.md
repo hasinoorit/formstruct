@@ -2,7 +2,7 @@
 
 A lightweight TypeScript library for parsing HTML form data into structured objects based on JSON Schema types. Designed to handle complex form inputs including multiselect, checkbox groups, and nullable fields.
 
-## Table of Contents
+## 📚 Table of Contents
 
 - [Features](#features)
 - [Installation](#installation)
@@ -15,14 +15,13 @@ A lightweight TypeScript library for parsing HTML form data into structured obje
   - [Using with Yup](#using-with-yup)
 - [Type Safety](#type-safety)
 - [API Reference](#api-reference)
-- [Error Handling](#error-handling)
 - [Troubleshooting](#troubleshooting)
 - [Version Compatibility](#version-compatibility)
 - [Default Values](#default-values)
 - [Contributing](#contributing)
 - [License](#license)
 
-## Features
+## ✨ Features
 
 - Parse FormData into structured JavaScript objects
 - Support for complex form inputs (multiselect, checkbox groups)
@@ -31,7 +30,7 @@ A lightweight TypeScript library for parsing HTML form data into structured obje
 - Support for nullable fields and default values
 - Clean and type-safe API
 
-## Installation
+## 🚀 Installation
 
 ```bash
 npm install formstruct
@@ -41,7 +40,7 @@ yarn add formstruct
 pnpm add formstruct
 ```
 
-## Basic Usage
+## 🎯 Basic Usage
 
 ```typescript
 import { createParser } from "formstruct";
@@ -121,7 +120,7 @@ const result = parser(formData);
 */
 ```
 
-## Complete Form Example
+## 📝 Complete Form Example
 
 ```html
 <form id="userProfileForm">
@@ -159,7 +158,7 @@ const result = parser(formData);
 </form>
 ```
 
-## Form Input Types
+## 🔧 Form Input Types
 
 ### Basic Fields
 
@@ -194,7 +193,7 @@ const result = parser(formData);
 </select>
 ```
 
-## Schema Validator Integration
+## 🔌 Schema Validator Integration
 
 FormStruct can be used with popular schema validators by converting their schemas to JSON Schema. Here's how to use it with different validators:
 
@@ -202,8 +201,8 @@ FormStruct can be used with popular schema validators by converting their schema
 
 ```typescript
 import { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
 import { createParser } from "formstruct";
+import { zodToJsonSchema } from "zod-to-json-schema";
 
 const userSchema = z.object({
   name: z.string(),
@@ -216,7 +215,7 @@ const userSchema = z.object({
   books: z.array(
     z.object({
       title: z.string(),
-      author: z.string(),
+      year: z.number(),
     })
   ),
   languages: z.array(z.string()),
@@ -231,12 +230,28 @@ const parser = createParser<z.infer<typeof userSchema>>(
 const result = parser(formData);
 ```
 
+💡 **Tip**: Create a reusable Zod adapter:
+
+```typescript
+import type { z } from "zod";
+import { createParser } from "formstruct";
+import { zodToJsonSchema } from "zod-to-json-schema";
+
+export const adapter = <T extends z.ZodType>(schema: T) => {
+  return createParser<z.infer<T>>(zodToJsonSchema(schema));
+};
+
+// Usage
+const parser = adapter(userSchema);
+const result = parser(formData);
+```
+
 ### Using with Valibot
 
 ```typescript
 import * as v from "valibot";
-import { toJsonSchema } from "@valibot/to-json-schema";
 import { createParser } from "formstruct";
+import { toJsonSchema } from "@valibot/to-json-schema";
 
 const userSchema = v.object({
   name: v.string(),
@@ -244,18 +259,12 @@ const userSchema = v.object({
   email: v.nullable(v.pipe(v.string(), v.email())),
   preferences: v.object({
     newsletter: v.boolean(),
-    theme: v.pipe(
-      v.string(),
-      v.enum({
-        light: "light",
-        dark: "dark",
-      })
-    ),
+    theme: v.union([v.literal("light"), v.literal("dark")]),
   }),
   books: v.array(
     v.object({
       title: v.string(),
-      author: v.string(),
+      year: v.number(),
     })
   ),
   languages: v.array(v.string()),
@@ -270,17 +279,33 @@ const parser = createParser<v.Output<typeof userSchema>>(
 const result = parser(formData);
 ```
 
+💡 **Tip**: Create a reusable Valibot adapter:
+
+```typescript
+import type { BaseSchema, Output } from "valibot";
+import { createParser } from "formstruct";
+import { toJsonSchema } from "@valibot/to-json-schema";
+
+export const adapter = <T extends BaseSchema>(schema: T) => {
+  return createParser<Output<T>>(toJsonSchema(schema));
+};
+
+// Usage
+const parser = adapter(userSchema);
+const result = parser(formData);
+```
+
 ### Using with Yup
 
 ```typescript
 import * as yup from "yup";
-import { convertSchema } from "@sodaru/yup-to-json-schema";
 import { createParser } from "formstruct";
+import { convertSchema } from "@sodaru/yup-to-json-schema";
 
 const userSchema = yup.object({
   name: yup.string().required(),
   age: yup.number().required(),
-  email: yup.string().email().nullable().required(),
+  email: yup.string().email().nullable(),
   preferences: yup
     .object({
       newsletter: yup.boolean().required(),
@@ -292,7 +317,7 @@ const userSchema = yup.object({
     .of(
       yup.object({
         title: yup.string().required(),
-        author: yup.string().required(),
+        year: yup.number().required(),
       })
     )
     .required(),
@@ -303,9 +328,28 @@ const userSchema = yup.object({
 const parser = createParser<yup.InferType<typeof userSchema>>(
   convertSchema(userSchema)
 );
+
+// Parse form data
+const result = parser(formData);
 ```
 
-## Type Safety
+💡 **Tip**: Create a reusable Yup adapter:
+
+```typescript
+import type { Schema, InferType } from "yup";
+import { createParser } from "formstruct";
+import { convertSchema } from "@sodaru/yup-to-json-schema";
+
+export const adapter = <T extends Schema>(schema: T) => {
+  return createParser<InferType<T>>(convertSchema(schema));
+};
+
+// Usage
+const parser = adapter(userSchema);
+const result = parser(formData);
+```
+
+## 🛡️ Type Safety
 
 All schema validators provide full type inference, giving you:
 
@@ -314,7 +358,7 @@ All schema validators provide full type inference, giving you:
 - Type errors if you try to access non-existent properties
 - Proper types for nullable fields and enums
 
-## API Reference
+## 📖 API Reference
 
 ### `createParser(schema: JSONSchema7)`
 
@@ -334,38 +378,7 @@ Creates a parser function based on the provided JSON Schema.
 - Use array notation for arrays: `books[0].title`
 - Multiple values for the same name become arrays: `languages`
 
-## Error Handling
-
-FormStruct provides detailed error messages when parsing fails:
-
-```typescript
-try {
-  const result = parser(formData);
-} catch (error) {
-  if (error instanceof ValidationError) {
-    // Structured validation errors
-    console.error("Validation failed:", error.errors);
-    // Example: { field: "age", message: "Expected number, got string" }
-  } else if (error instanceof SchemaError) {
-    // Schema configuration errors
-    console.error("Schema error:", error.message);
-    // Example: "Invalid schema: missing required property type"
-  } else {
-    // Unexpected errors
-    console.error("Parser error:", error);
-  }
-}
-```
-
-Common validation errors:
-
-- Missing required fields
-- Invalid field types
-- Failed format validation (e.g., email)
-- Array length constraints
-- Enum value mismatches
-
-## Troubleshooting
+## ❓ Troubleshooting
 
 ### Common Issues
 
@@ -411,7 +424,7 @@ Common validation errors:
    const schema = { age: { type: "number" } };
    ```
 
-## Version Compatibility
+## 🔄 Version Compatibility
 
 | FormStruct | Node.js  | TypeScript |
 | ---------- | -------- | ---------- |
@@ -438,10 +451,10 @@ For older browsers, you may need a polyfill for:
 - Optional chaining (?.)
 - Nullish coalescing (??)
 
-## Contributing
+## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
-## License
+## 📄 License
 
 MIT
