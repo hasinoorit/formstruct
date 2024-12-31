@@ -1,5 +1,73 @@
 import type { JSONSchema7 as Schema, JSONSchema7Definition } from "./types";
 
+/**
+ * Resolves a $ref within a schema using the root schema.
+ *
+ * @param ref - The $ref string to resolve.
+ * @param rootSchema - The root schema containing all definitions.
+ * @returns The resolved schema.
+ */
+function resolveRef(ref: string, rootSchema: Schema): Schema {
+  const refPath = ref.replace(/^#\//, "").split("/");
+  let resolvedSchema: any = rootSchema;
+  for (const key of refPath) {
+    resolvedSchema = resolvedSchema[key];
+    if (!resolvedSchema) {
+      throw new Error(`Unable to resolve $ref: ${ref}`);
+    }
+  }
+  return resolvedSchema;
+}
+
+/**
+ * Recursively resolves $ref and normalizes a schema.
+ *
+ * @param schema - The schema to resolve.
+ * @param rootSchema - The root schema containing all definitions.
+ * @returns The normalized schema.
+ */
+function resolve(schema: Schema, rootSchema: Schema): Schema {
+  if (schema.$ref) {
+    const resolvedSchema = resolveRef(schema.$ref, rootSchema);
+    return {
+      ...resolve(resolvedSchema, rootSchema),
+      ...schema,
+      $ref: undefined,
+    };
+  }
+
+  if (schema.type === "object" && schema.properties) {
+    const normalizedProperties: Record<string, Schema> = {};
+    for (const [key, propSchema] of Object.entries(schema.properties)) {
+      normalizedProperties[key] = resolve(propSchema as Schema, rootSchema);
+    }
+    return { ...schema, properties: normalizedProperties };
+  }
+
+  if (schema.type === "array" && schema.items) {
+    return { ...schema, items: resolve(schema.items as Schema, rootSchema) };
+  }
+
+  return schema;
+}
+
+/**
+ * Normalizes a JSON Schema by resolving all $ref references.
+ *
+ * @param schema - The JSON Schema to normalize.
+ * @param rootSchema - The root schema containing all definitions.
+ * @returns The normalized schema.
+ */
+function normalizeSchema(schema: Schema, rootSchema: Schema): Schema {
+  return resolve(schema, rootSchema);
+}
+
+/**
+ * Enhances a JSON Schema by adding additional metadata and default values.
+ * Handles object properties, arrays, and adds prefilled values for certain types.
+ *
+ * @param schema - The JSON Schema to enhance
+ */
 const enhanceSchema = (schema: JSONSchema7Definition) => {
   if (typeof schema === "boolean") {
     return schema;
@@ -39,6 +107,13 @@ const enhanceSchema = (schema: JSONSchema7Definition) => {
   }
 };
 
+/**
+ * Gets a schema from an array of schemas based on the next key/index.
+ *
+ * @param schema - The schema or array of schemas to search through
+ * @param next - Optional next key or index to help determine which schema to return
+ * @returns The matching schema or an empty object if none found
+ */
 function getByNext(schema: Schema[] | Schema, next?: number | string): Schema {
   if (!Array.isArray(schema)) {
     return schema;
@@ -52,6 +127,14 @@ function getByNext(schema: Schema[] | Schema, next?: number | string): Schema {
   return schema.find((s) => !!s.properties?.[next]) || {};
 }
 
+/**
+ * Gets the current schema for a given key path, handling nested objects and arrays.
+ *
+ * @param schema - The parent schema to search in
+ * @param key - The current key or index being accessed
+ * @param nextKey - Optional next key in the path for better schema resolution
+ * @returns The schema for the current key path
+ */
 const getCurrentSchema = (
   schema: Schema,
   key: number | string,
@@ -79,6 +162,12 @@ const getCurrentSchema = (
   return {};
 };
 
+/**
+ * Gets the default value for a schema based on its type and properties.
+ *
+ * @param schema - The schema to get the default value for
+ * @returns The default value for the schema, or undefined if no default can be determined
+ */
 const getDefault = (schema: Schema) => {
   if (schema.prefilled) {
     return { ...schema.prefilled };
@@ -120,6 +209,13 @@ const getDefault = (schema: Schema) => {
   }
 };
 
+/**
+ * Parses a form data value according to the schema type.
+ *
+ * @param schema - The schema defining the expected type
+ * @param value - The form data value to parse
+ * @returns The parsed value according to the schema type
+ */
 const parseValue = (schema: Schema, value: FormDataEntryValue) => {
   if (schema.nullable && value === "") {
     return null;
@@ -141,6 +237,16 @@ const parseValue = (schema: Schema, value: FormDataEntryValue) => {
   }
   return value;
 };
+
+/**
+ * Sets a nested value in an object based on an array of keys.
+ * Creates intermediate objects/arrays as needed and handles type conversion.
+ *
+ * @param schema - The schema for type validation
+ * @param rootObject - The root object to set the value in
+ * @param keys - Array of keys representing the path to the value
+ * @param value - The form data value to set
+ */
 const setNestedValue = (
   schema: Schema,
   rootObject: any,
@@ -179,8 +285,16 @@ const setNestedValue = (
   }
 };
 
+/**
+ * Creates a form data parser based on a JSON Schema.
+ * The parser converts FormData into a typed object structure.
+ *
+ * @param schema - The JSON Schema to use for parsing
+ * @returns A function that converts FormData into the schema-defined type T
+ * @template T - The type of the resulting parsed object
+ */
 export const createParser = <T = any>(schema: Schema) => {
-  enhanceSchema(schema);
+  enhanceSchema(normalizeSchema(schema, schema));
   return (formData: FormData): T => {
     const root: any = getDefault(schema);
     formData.forEach((value, key) => {
@@ -189,8 +303,4 @@ export const createParser = <T = any>(schema: Schema) => {
     });
     return root as T;
   };
-};
-
-export const adapter = <T = any>(schema: Schema) => {
-  return createParser<T>(schema);
 };
