@@ -1,0 +1,47 @@
+{
+  "name": "formstruct",
+  "version": "1.0.0",
+  "description": "Effortlessly transform raw form data into structured objects using JSON Schema.",
+  "author": "MD. HASHINUR RAHMAN",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "test": "vitest",
+    "build": "unbuild",
+    "prepack": "unbuild"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "main": "./dist/index.cjs",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "form",
+    "formdata",
+    "parser",
+    "json-schema",
+    "typescript",
+    "form-handling",
+    "zod",
+    "valibot",
+    "yup"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hasinoorit/formstruct.git"
+  },
+  "bugs": {
+    "url": "https://github.com/hasinoorit/formstruct/issues"
+  },
+  "homepage": "https://github.com/hasinoorit/formstruct#readme",
+  "devDependencies": {
+    "unbuild": "^3.2.0",
+    "vitest": "^2.1.8"
+  }
+}

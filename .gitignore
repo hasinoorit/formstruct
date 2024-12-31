@@ -25,7 +25,40 @@ coverage
 
 # nyc test coverage
 .nyc_output
+# Dependencies
+node_modules/
 
+# Package manager lock files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+npm-shrinkwrap.json
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+lib/
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment variables
+.env
+.env.local
+.env.*.local
 # Grunt intermediate storage (https://gruntjs.com/creating-plugins#storing-task-files)
 .grunt
 
