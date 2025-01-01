@@ -16,6 +16,7 @@ A lightweight TypeScript library for parsing HTML form data into structured obje
 - [Type Safety](#type-safety)
 - [API Reference](#api-reference)
 - [Troubleshooting](#troubleshooting)
+- [Limitations](#limitations)
 - [Version Compatibility](#version-compatibility)
 - [Default Values](#default-values)
 - [Contributing](#contributing)
@@ -423,6 +424,35 @@ Creates a parser function based on the provided JSON Schema.
    // ✅ Correct: String will be coerced to number
    const schema = { age: { type: "number" } };
    ```
+
+## 🚫 Limitations
+
+FormStruct is designed to be a lightweight form data parser, not a full schema validator. Here are some important limitations to be aware of:
+
+### Compound Schema Types (anyOf/oneOf/allOf)
+
+- For primitive types (string, number, boolean), the parser will use the first schema from anyOf/oneOf/allOf
+- For object/array types, it attempts to match the first schema based on property names
+- If no matching schema is found for an object/array, the field will not be transformed
+
+### Object Initialization
+
+- Child objects are only initialized when at least one of their properties is present in the form data
+- Default values in nested objects won't trigger object initialization if no form data is provided for that object path
+- Nested default values are only applied when their parent object is initialized by form data
+
+### Validation
+
+- FormStruct does not perform schema validation
+- It only handles data transformation according to the schema types
+
+💡 **Tip**: For conditional validation, transform the data before passing it to a validator (FormData → FormStruct → Transform → Validate)
+
+### Type Coercion
+
+- Basic type coercion is performed (string to number/boolean)
+- Complex type coercion (e.g., string to date) is not supported
+- Custom formats are not validated
 
 ## 🔄 Version Compatibility
 

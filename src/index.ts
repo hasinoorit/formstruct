@@ -1,66 +1,63 @@
 import type { JSONSchema7 as Schema, JSONSchema7Definition } from "./types";
-
 /**
- * Resolves a $ref within a schema using the root schema.
- *
- * @param ref - The $ref string to resolve.
- * @param rootSchema - The root schema containing all definitions.
- * @returns The resolved schema.
+ * Creates a parser that can be used to transform form data into structured objects based on the provided JSON schema.
+ * @param schema - The JSON schema to use for parsing.
+ * @returns A parser function that takes a FormData object and returns a parsed object conforming to the schema.
+ * @throws If the schema is invalid.
  */
-function resolveRef(ref: string, rootSchema: Schema): Schema {
-  const refPath = ref.replace(/^#\//, "").split("/");
-  let resolvedSchema: any = rootSchema;
-  for (const key of refPath) {
-    resolvedSchema = resolvedSchema[key];
-    if (!resolvedSchema) {
-      throw new Error(`Unable to resolve $ref: ${ref}`);
+
+const resolveRef = (
+  schema: JSONSchema7Definition,
+  rootSchema: JSONSchema7Definition,
+  visited: Set<JSONSchema7Definition> = new Set()
+): void => {
+  if (
+    typeof schema !== "object" ||
+    typeof rootSchema !== "object" ||
+    visited.has(schema)
+  ) {
+    return;
+  }
+  visited.add(schema);
+  if ("$ref" in schema && typeof schema.$ref === "string") {
+    const ref = schema.$ref;
+    if (ref === "#") {
+      Object.setPrototypeOf(schema, rootSchema);
+      return;
+    }
+    // Handle circular references
+    // If the $ref is a relative reference (starts with '#')
+    if (ref.startsWith("#")) {
+      // Resolve the reference within the root schema
+      const path = ref.slice(2).split("/"); // Remove "#/" and split by '/'
+      let resolved = rootSchema;
+
+      // Traverse through the root schema based on the path
+      for (const segment of path) {
+        resolved = resolved[segment];
+        if (!resolved) {
+          throw new Error(`Unable to resolve reference: ${ref}`);
+        }
+      }
+
+      // Replace the $ref with the resolved schema
+      Object.setPrototypeOf(schema, resolved);
+      delete schema.$ref; // Remove $ref from the schema as it's now resolved
     }
   }
-  return resolvedSchema;
-}
 
-/**
- * Recursively resolves $ref and normalizes a schema.
- *
- * @param schema - The schema to resolve.
- * @param rootSchema - The root schema containing all definitions.
- * @returns The normalized schema.
- */
-function resolve(schema: Schema, rootSchema: Schema): Schema {
-  if (schema.$ref) {
-    const resolvedSchema = resolveRef(schema.$ref, rootSchema);
-    return {
-      ...resolve(resolvedSchema, rootSchema),
-      ...schema,
-      $ref: undefined,
-    };
-  }
-
-  if (schema.type === "object" && schema.properties) {
-    const normalizedProperties: Record<string, Schema> = {};
-    for (const [key, propSchema] of Object.entries(schema.properties)) {
-      normalizedProperties[key] = resolve(propSchema as Schema, rootSchema);
+  // Recursively traverse the schema
+  for (const key in schema) {
+    const subSchema = schema[key];
+    if (subSchema && typeof subSchema === "object") {
+      if (Array.isArray(subSchema)) {
+        subSchema.forEach((item: any) => resolveRef(item, rootSchema, visited));
+      } else {
+        resolveRef(subSchema, rootSchema, visited);
+      }
     }
-    return { ...schema, properties: normalizedProperties };
   }
-
-  if (schema.type === "array" && schema.items) {
-    return { ...schema, items: resolve(schema.items as Schema, rootSchema) };
-  }
-
-  return schema;
-}
-
-/**
- * Normalizes a JSON Schema by resolving all $ref references.
- *
- * @param schema - The JSON Schema to normalize.
- * @param rootSchema - The root schema containing all definitions.
- * @returns The normalized schema.
- */
-function normalizeSchema(schema: Schema, rootSchema: Schema): Schema {
-  return resolve(schema, rootSchema);
-}
+};
 
 /**
  * Enhances a JSON Schema by adding additional metadata and default values.
@@ -91,10 +88,15 @@ const enhanceSchema = (schema: JSONSchema7Definition) => {
       } else if (subSchema.type === "boolean") {
         prefilled[key] = false;
       } else if (subSchema.type === "array") {
-        prefilled[key] = [];
+        Object.defineProperty(prefilled, key, {
+          get() {
+            return [];
+          },
+          enumerable: true,
+        });
       }
-      if (Object.prototype.hasOwnProperty.call(subSchema, "default")) {
-        prefilled[key] = subSchema.default;
+      if ("default" in subSchema) {
+        prefilled[key] = JSON.parse(JSON.stringify(subSchema.default));
       }
     }
     schema.prefilled = prefilled;
@@ -103,6 +105,16 @@ const enhanceSchema = (schema: JSONSchema7Definition) => {
       schema.items.forEach((item) => enhanceSchema(item));
     } else {
       enhanceSchema(schema.items);
+    }
+  }
+  if ("$defs" in schema && typeof schema.$defs === "object") {
+    for (const [_, value] of Object.entries(schema.$defs)) {
+      enhanceSchema(value);
+    }
+  }
+  if ("definitions" in schema && typeof schema.definitions === "object") {
+    for (const [_, value] of Object.entries(schema.definitions)) {
+      enhanceSchema(value);
     }
   }
 };
@@ -294,13 +306,13 @@ const setNestedValue = (
  * @template T - The type of the resulting parsed object
  */
 export const createParser = <T = any>(schema: Schema) => {
-  const _schema = normalizeSchema(schema, schema);
-  enhanceSchema(_schema);
+  resolveRef(schema, schema);
+  enhanceSchema(schema);
   return (formData: FormData): T => {
-    const root: any = getDefault(_schema);
+    const root: any = getDefault(schema);
     formData.forEach((value, key) => {
       const keys = key.replace(/\[(\d+)]/g, ".$1").split(".");
-      setNestedValue(_schema, root, keys, value);
+      setNestedValue(schema, root, keys, value);
     });
     return root as T;
   };
